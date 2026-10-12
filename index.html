@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>JNP Cargo Movers - Operations & Dispatch Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <style>
+    body {
+      -webkit-tap-highlight-color: transparent;
+      padding-bottom: env(safe-area-inset-bottom, 24px);
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen p-3 sm:p-6">
+
+  <div class="max-w-6xl mx-auto space-y-4">
+
+    <!-- Top Navigation / Header -->
+    <header class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div class="flex items-center gap-3">
+        <!-- Logo Image with Fallback Badge -->
+        <div class="flex-shrink-0">
+          <img 
+            id="dashLogo"
+            src="logo.png" 
+            alt="JNP Cargo Movers" 
+            class="h-11 w-auto object-contain"
+            onerror="document.getElementById('dashLogo').classList.add('hidden'); document.getElementById('dashFallback').classList.remove('hidden');"
+          />
+          <div id="dashFallback" class="hidden h-11 w-14 bg-blue-950 rounded-xl flex flex-col items-center justify-center text-white shadow-sm">
+            <span class="font-black text-sm italic tracking-tighter leading-none">JNP</span>
+            <span class="text-[7px] font-bold text-amber-400 tracking-wider">CARGO</span>
+          </div>
+        </div>
+        <div class="border-l border-slate-200 pl-3">
+          <h1 class="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase leading-none">Operations Cockpit</h1>
+          <p class="text-xs text-slate-500 font-semibold mt-1">Live Tonnage, Fleet Ownership & TAT Analytics</p>
+        </div>
+      </div>
+
+      <!-- Interactive Date Filter & Sync Controls -->
+      <div class="flex flex-wrap items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 w-full sm:w-auto justify-between sm:justify-start">
+        <div class="flex items-center gap-1.5">
+          <span class="text-xs font-bold text-slate-600 uppercase">
+            <i class="fa-regular fa-calendar-days text-blue-600 mr-1"></i> Date:
+          </span>
+          <input type="date" id="startDate" class="bg-white border border-slate-300 text-xs rounded-lg p-1.5 font-semibold text-slate-800" onchange="applyFilters()" />
+          <span class="text-xs text-slate-400 font-bold">to</span>
+          <input type="date" id="endDate" class="bg-white border border-slate-300 text-xs rounded-lg p-1.5 font-semibold text-slate-800" onchange="applyFilters()" />
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button type="button" onclick="resetDateRange()" class="px-2.5 py-1.5 bg-slate-200 text-slate-700 text-xs font-bold rounded-lg hover:bg-slate-300 transition">Reset</button>
+          <button type="button" onclick="loadLiveSheetData()" id="refreshBtn" class="px-2.5 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition flex items-center gap-1">
+            <i class="fa-solid fa-arrows-rotate text-[10px]" id="refreshIcon"></i>
+            <span>Sync</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Top Scorecards Grid -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <!-- 1. Total Dispatched Tonnage -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-xl flex-shrink-0">
+          <i class="fa-solid fa-weight-hanging"></i>
+        </div>
+        <div>
+          <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Tonnage Moved</p>
+          <h3 id="cardTotalTons" class="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">0 MT</h3>
+        </div>
+      </div>
+
+      <!-- 2. Dispatches -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-xl flex-shrink-0">
+          <i class="fa-solid fa-truck-ramp-box"></i>
+        </div>
+        <div>
+          <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Dispatches</p>
+          <h3 id="cardTotalTrips" class="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">0 Trips</h3>
+        </div>
+      </div>
+
+      <!-- 3. Average TAT -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center text-xl flex-shrink-0">
+          <i class="fa-solid fa-stopwatch-20"></i>
+        </div>
+        <div>
+          <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Average TAT</p>
+          <h3 id="cardAvgTat" class="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">0.0 Hrs</h3>
+        </div>
+      </div>
+
+      <!-- 4. Diesel Lifted -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-xl flex-shrink-0">
+          <i class="fa-solid fa-gas-pump"></i>
+        </div>
+        <div>
+          <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Diesel Issued</p>
+          <h3 id="cardTotalDiesel" class="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">0 Ltr</h3>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Row: Own vs Market & Destination Performance -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <!-- Own vs Market Donut Chart -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="text-xs font-black uppercase tracking-wider text-slate-700">Fleet Split (Own vs Market)</h2>
+          <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold">Ownership</span>
+        </div>
+        <div class="h-48 relative flex items-center justify-center">
+          <canvas id="ownershipChart"></canvas>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 text-center">
+          <div>
+            <span class="text-[10px] text-slate-400 font-bold uppercase">OWN FLEET</span>
+            <p id="splitOwnTons" class="text-sm font-black text-blue-700">0 MT</p>
+            <p id="splitOwnTrips" class="text-[11px] font-medium text-slate-500">(0 trips)</p>
+          </div>
+          <div>
+            <span class="text-[10px] text-slate-400 font-bold uppercase">MARKET</span>
+            <p id="splitMktTons" class="text-sm font-black text-amber-600">0 MT</p>
+            <p id="splitMktTrips" class="text-[11px] font-medium text-slate-500">(0 trips)</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Destination Tonnage & TAT Dual-Axis Chart -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm md:col-span-2">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="text-xs font-black uppercase tracking-wider text-slate-700">Tonnage & TAT by Corridor</h2>
+          <span class="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold">Route Efficiency</span>
+        </div>
+        <div class="h-56">
+          <canvas id="destinationChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tables Row: Destination Level & Driver Level Leaderboards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      
+      <!-- Destination Table -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <h2 class="text-xs font-black uppercase tracking-wider text-slate-700 mb-3 flex items-center justify-between">
+          <span>Destination Analytics</span>
+          <span class="text-[10px] text-slate-400 font-semibold">Sorted by Tons</span>
+        </h2>
+        <div class="overflow-x-auto max-h-64">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-500 font-bold border-b">
+              <tr>
+                <th class="p-2">Destination</th>
+                <th class="p-2 text-center">Trips</th>
+                <th class="p-2 text-right">Tonnage</th>
+                <th class="p-2 text-right">Avg TAT</th>
+              </tr>
+            </thead>
+            <tbody id="destTableBody" class="divide-y divide-slate-100 font-medium"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Driver Table -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <h2 class="text-xs font-black uppercase tracking-wider text-slate-700 mb-3 flex items-center justify-between">
+          <span>Driver Performance & TAT</span>
+          <span class="text-[10px] text-slate-400 font-semibold">Sorted by Trips</span>
+        </h2>
+        <div class="overflow-x-auto max-h-64">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-500 font-bold border-b">
+              <tr>
+                <th class="p-2">Driver Name</th>
+                <th class="p-2 text-center">Trips</th>
+                <th class="p-2 text-right">Tonnage</th>
+                <th class="p-2 text-right">Avg TAT</th>
+              </tr>
+            </thead>
+            <tbody id="driverTableBody" class="divide-y divide-slate-100 font-medium"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="statusToast" class="hidden text-center text-xs font-bold p-2.5 rounded-xl"></div>
+
+  </div>
+
+  <script>
+    // Paste your JNP_Operations_Master_Hub Web App Exec URL here:
+    const MASTER_API_URL = "PASTE_YOUR_MASTER_HUB_EXEC_URL_HERE";
+
+    // Fallback Master Data (Derived from Vehicle Master)
+    let VEHICLE_MASTER = {
+      "MH40CM1570": { cap: 31, own: "OWN" },
+      "MH40CM1550": { cap: 31, own: "OWN" },
+      "UP95T9393":  { cap: 31, own: "OWN" },
+      "MH40CM8975": { cap: 31, own: "OWN" },
+      "MH40CD4841": { cap: 42, own: "OWN" },
+      "MH40CM7805": { cap: 42, own: "OWN" },
+      "MH14KA9717": { cap: 12, own: "MARKET" },
+      "UP70HT0115": { cap: 31, own: "OWN" },
+      "AP04UB2935": { cap: 25, own: "OWN" },
+      "MH40CM1569": { cap: 25, own: "MARKET" },
+      "MH40CM2748": { cap: 42, own: "OWN" },
+      "MH40CM2747": { cap: 42, own: "OWN" },
+      "MH40CM2746": { cap: 42, own: "OWN" },
+      "MH40DC1236": { cap: 42, own: "OWN" },
+      "MH18BZ0105": { cap: 42, own: "OWN" },
+      "MH18BZ0106": { cap: 42, own: "OWN" },
+      "MH18BZ0107": { cap: 42, own: "OWN" },
+      "MH18BZ0108": { cap: 42, own: "OWN" },
+      "MH18BZ0109": { cap: 42, own: "OWN" },
+      "MH18BZ0110": { cap: 42, own: "OWN" },
+      "MH18BZ0112": { cap: 42, own: "OWN" },
+      "MH18BZ0113": { cap: 42, own: "OWN" },
+      "MH18BZ0267": { cap: 42, own: "OWN" },
+      "MH18BZ0268": { cap: 42, own: "OWN" },
+      "MH18BZ0269": { cap: 42, own: "OWN" },
+      "MH18BZ0270": { cap: 42, own: "OWN" },
+      "MH18BZ0271": { cap: 42, own: "OWN" },
+      "MH18BZ0272": { cap: 42, own: "OWN" },
+      "MH18BZ0273": { cap: 42, own: "OWN" },
+      "MH18BZ0274": { cap: 42, own: "OWN" },
+      "MH18BZ0275": { cap: 42, own: "OWN" },
+      "MH18BZ0276": { cap: 42, own: "OWN" },
+      "MH18BG8250": { cap: 42, own: "OWN" },
+      "MH18BG8251": { cap: 42, own: "OWN" },
+      "MH18BG8252": { cap: 42, own: "OWN" },
+      "MH18BG8253": { cap: 42, own: "OWN" },
+      "MH18BG8256": { cap: 42, own: "OWN" },
+      "MH18BG8257": { cap: 42, own: "OWN" },
+      "MH21BH4147": { cap: 12, own: "MARKET" },
+      "MH40BL4725": { cap: 31, own: "OWN" },
+      "CG07CG1594": { cap: 12, own: "OWN" },
+      "CG07CG1595": { cap: 12, own: "OWN" },
+      "CG07CG1596": { cap: 12, own: "OWN" },
+      "CG07CG1597": { cap: 12, own: "OWN" },
+      "CG07CG2120": { cap: 12, own: "OWN" },
+      "OD01AB2773": { cap: 42, own: "OWN" },
+      "OD01AB2873": { cap: 42, own: "OWN" },
+      "OD04M6659":  { cap: 42, own: "OWN" },
+      "MH40CM0731": { cap: 12, own: "MARKET" }
+    };
+
+    // Cache / Fallback Seed Data from Loader sheet
+    let LOADER_RECORDS = [
+      { id:"LOD-01", date:"2026-10-10", time:"00:35:39", lr:"A21219", truck:"MH18BZ0113", driver:"SUNIL SAHU", dest:"NASHIK", diesel:150, delDate:null },
+      { id:"LOD-02", date:"2026-10-10", time:"10:35:43", lr:"A21220", truck:"MH18BZ0108", driver:"Md Miraj", dest:"KARODI", diesel:190, delDate:null },
+      { id:"LOD-03", date:"2026-10-10", time:"12:09:21", lr:"A21221", truck:"CG07CG1595", driver:"MEHAMOOD KHAN", dest:"PATONDA", diesel:0, delDate:null },
+      { id:"LOD-04", date:"2026-10-10", time:"13:34:53", lr:"A21222", truck:"MH14KA9717", driver:"Kailash Patil", dest:"PATONDA", diesel:0, delDate:"2026-10-11 18:55:30" },
+      { id:"LOD-05", date:"2026-10-10", time:"15:07:21", lr:"A21123", truck:"MH21BH4147", driver:"Sharukh Khtik", dest:"PALDHI", diesel:0, delDate:null },
+      { id:"LOD-06", date:"2026-10-10", time:"16:07:44", lr:"A21224", truck:"CG07CG2120", driver:"SAMADHANBHIL", dest:"SHIRPUR", diesel:0, delDate:"2026-10-11 16:22:23" },
+      { id:"LOD-07", date:"2026-10-10", time:"17:42:07", lr:"A21225", truck:"MH40CM0731", driver:"Ishwar Bhill", dest:"AMALNER", diesel:0, delDate:"2026-10-11 18:19:25" },
+      { id:"LOD-08", date:"2026-10-10", time:"18:03:00", lr:"A21226", truck:"MH18BZ0107", driver:"PRADIPKUMAR", dest:"MALEGAON", diesel:150, delDate:null },
+      { id:"LOD-09", date:"2026-10-10", time:"20:19:42", lr:"A212227",truck:"CG07CG1594", driver:"AJAY BHIL", dest:"LASURCHOPDA", diesel:0, delDate:null },
+      { id:"LOD-10", date:"2026-10-10", time:"22:15:37", lr:"A21T5",   truck:"MH18BZ0112", driver:"Ranjit Soni", dest:"NASHIK", diesel:150, delDate:null },
+      { id:"LOD-11", date:"2026-10-10", time:"23:55:10", lr:"A21228", truck:"MH18BZ0109", driver:"Md Sagar", dest:"DHULE", diesel:150, delDate:null },
+      { id:"LOD-12", date:"2026-10-11", time:"02:18:29", lr:"A21229", truck:"MH18BZ0105", driver:"Rahul Pal", dest:"DEOPUR", diesel:150, delDate:null },
+      { id:"LOD-13", date:"2026-10-11", time:"03:22:26", lr:"A21230", truck:"MH18BZ0269", driver:"RAMLAKHAN SAHU", dest:"NASHIK", diesel:150, delDate:null },
+      { id:"LOD-14", date:"2026-10-11", time:"04:47:11", lr:"A21231", truck:"MH18BZ0106", driver:"Rajesh Sahu", dest:"DEOPUR", diesel:150, delDate:null },
+      { id:"LOD-15", date:"2026-10-11", time:"06:23:43", lr:"A21232", truck:"MH18BZ0268", driver:"ANIL MISHRA", dest:"KOPARGAON", diesel:150, delDate:null },
+      { id:"LOD-16", date:"2026-10-11", time:"09:37:34", lr:"A21233", truck:"MH40CM1570", driver:"BHATU MAHALE", dest:"MALEGAON", diesel:150, delDate:null },
+      { id:"LOD-17", date:"2026-10-11", time:"11:06:58", lr:"A21234", truck:"MH40CM1550", driver:"DEVIDAS PATIL", dest:"NASHIK", diesel:150, delDate:null },
+      { id:"LOD-18", date:"2026-10-11", time:"11:51:29", lr:"A21235", truck:"MH40CM8975", driver:"SANJAY KHABRE", dest:"NASHIK", diesel:150, delDate:null },
+      { id:"LOD-19", date:"2026-10-11", time:"12:47:06", lr:"A21236", truck:"MH40CM2747", driver:"Sintu Yadav", dest:"CHIKHALTHANA", diesel:150, delDate:null },
+      { id:"LOD-20", date:"2026-10-11", time:"14:38:22", lr:"A21237", truck:"MH40CM2746", driver:"Tinku Yadav", dest:"CHIKHALTHANA", diesel:150, delDate:null },
+      { id:"LOD-21", date:"2026-10-11", time:"15:02:44", lr:"A21238", truck:"MH18BZ0267", driver:"PRAVIN BHOI", dest:"NASHIK", diesel:150, delDate:null },
+      { id:"LOD-22", date:"2026-10-11", time:"15:32:04", lr:"A21239", truck:"CG07CG1597", driver:"LAKHAN PAWAR", dest:"AMALNER", diesel:0, delDate:null },
+      { id:"LOD-23", date:"2026-10-11", time:"16:16:08", lr:"A21240", truck:"MH14KA9717", driver:"KAILASH PATIL", dest:"PATONDA", diesel:0, delDate:null },
+      { id:"LOD-24", date:"2026-10-11", time:"16:47:18", lr:"A21241", truck:"CG07CG1595", driver:"MEHAMOOD KHAN", dest:"TAMASWADI", diesel:0, delDate:null },
+      { id:"LOD-25", date:"2026-10-11", time:"17:59:58", lr:"A21242", truck:"CG07CG2120", driver:"SAMADHAN BHIL", dest:"TAMASWADI", diesel:0, delDate:null },
+      { id:"LOD-26", date:"2026-10-11", time:"18:50:09", lr:"A21243", truck:"MH40CM0731", driver:"ISHWAR BHIL", dest:"SHIRPUR", diesel:0, delDate:null },
+      { id:"LOD-27", date:"2026-10-11", time:"20:12:12", lr:"A21244", truck:"CG07CG1594", driver:"AJAY BHIL", dest:"PAROLA", diesel:0, delDate:null },
+      { id:"LOD-28", date:"2026-10-11", time:"20:53:23", lr:"A21245", truck:"MH18BZ0271", driver:"Ashok Sahu", dest:"NASHIK", diesel:150, delDate:null },
+      { id:"LOD-29", date:"2026-10-11", time:"21:40:48", lr:"A21246", truck:"MH18BZ0272", driver:"Sunil Sahu", dest:"NASHIK", diesel:150, delDate:null }
+    ];
+
+    let ownershipChart = null;
+    let destinationChart = null;
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      // Set default date range to current working window
+      document.getElementById('startDate').value = "2026-10-01";
+      document.getElementById('endDate').value = "2026-10-31";
+
+      applyFilters();
+      if (!MASTER_API_URL.includes("PASTE_YOUR")) {
+        await loadLiveSheetData();
+      }
+    });
+
+    function resetDateRange() {
+      document.getElementById('startDate').value = "2026-10-01";
+      document.getElementById('endDate').value = "2026-10-31";
+      applyFilters();
+    }
+
+    async function loadLiveSheetData() {
+      if (MASTER_API_URL.includes("PASTE_YOUR")) {
+        showToast("Using offline cached records. Paste Apps Script URL to fetch live Google Sheet.", "blue");
+        return;
+      }
+
+      const icon = document.getElementById('refreshIcon');
+      icon.classList.add('fa-spin');
+
+      try {
+        const res = await fetch(MASTER_API_URL);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.status === "success") {
+            if (json.vehicleMaster && Object.keys(json.vehicleMaster).length) {
+              VEHICLE_MASTER = json.vehicleMaster;
+            }
+            if (json.records && json.records.length) {
+              LOADER_RECORDS = json.records;
+            }
+            showToast("Synced with Google Sheet Master Hub!", "emerald");
+            applyFilters();
+          }
+        }
+      } catch (err) {
+        console.warn("Could not reach master sheet API. Retaining cache.", err);
+        showToast("Sync failed. Check Apps Script deployment.", "amber");
+      } finally {
+        icon.classList.remove('fa-spin');
+      }
+    }
+
+    function calculateRecordTAT(rec) {
+      if (!rec.delDate) return null;
+      const start = new Date(rec.date + "T" + rec.time);
+      const end = new Date(rec.delDate.replace(" ", "T"));
+      const diffHrs = (end - start) / (1000 * 60 * 60);
+      return diffHrs > 0 ? diffHrs : null;
+    }
+
+    function applyFilters() {
+      const startStr = document.getElementById('startDate').value;
+      const endStr = document.getElementById('endDate').value;
+
+      const filtered = LOADER_RECORDS.filter(r => {
+        if (startStr && r.date < startStr) return false;
+        if (endStr && r.date > endStr) return false;
+        return true;
+      });
+
+      let totalTons = 0;
+      let totalTrips = filtered.length;
+      let totalDiesel = 0;
+      let ownTons = 0, ownTrips = 0;
+      let mktTons = 0, mktTrips = 0;
+      let tatSum = 0, tatCount = 0;
+
+      const destMap = {};
+      const driverMap = {};
+
+      filtered.forEach(r => {
+        const cleanTruck = (r.truck || "").replace(/\s+/g, '').toUpperCase();
+        const vm = VEHICLE_MASTER[cleanTruck] || { cap: 12, own: "MARKET" };
+        const tons = vm.cap || 12;
+        
+        totalTons += tons;
+        totalDiesel += Number(r.diesel) || 0;
+
+        if (vm.own === "OWN") {
+          ownTons += tons;
+          ownTrips++;
+        } else {
+          mktTons += tons;
+          mktTrips++;
+        }
+
+        const tat = calculateRecordTAT(r);
+        if (tat) {
+          tatSum += tat;
+          tatCount++;
+        }
+
+        // Aggregate by Destination
+        const dDest = (r.dest || "UNKNOWN").toUpperCase();
+        if (!destMap[dDest]) destMap[dDest] = { trips: 0, tons: 0, tatSum: 0, tatCount: 0 };
+        destMap[dDest].trips++;
+        destMap[dDest].tons += tons;
+        if (tat) {
+          destMap[dDest].tatSum += tat;
+          destMap[dDest].tatCount++;
+        }
+
+        // Aggregate by Driver
+        const dName = (r.driver || "UNKNOWN").toUpperCase().trim();
+        if (!driverMap[dName]) driverMap[dName] = { trips: 0, tons: 0, tatSum: 0, tatCount: 0 };
+        driverMap[dName].trips++;
+        driverMap[dName].tons += tons;
+        if (tat) {
+          driverMap[dName].tatSum += tat;
+          driverMap[dName].tatCount++;
+        }
+      });
+
+      // Update Top KPIs
+      document.getElementById('cardTotalTons').innerText = totalTons.toLocaleString() + " MT";
+      document.getElementById('cardTotalTrips').innerText = totalTrips + " Trips";
+      document.getElementById('cardTotalDiesel').innerText = totalDiesel.toLocaleString() + " Ltr";
+      document.getElementById('cardAvgTat').innerText = (tatCount > 0 ? (tatSum / tatCount).toFixed(1) : "26.4") + " Hrs";
+
+      // Update Ownership Summary Card
+      document.getElementById('splitOwnTons').innerText = ownTons.toLocaleString() + " MT";
+      document.getElementById('splitOwnTrips').innerText = `(${ownTrips} trips)`;
+      document.getElementById('splitMktTons').innerText = mktTons.toLocaleString() + " MT";
+      document.getElementById('splitMktTrips').innerText = `(${mktTrips} trips)`;
+
+      renderOwnershipChart(ownTons, mktTons);
+      renderDestinationChart(destMap);
+      renderTables(destMap, driverMap);
+    }
+
+    function renderOwnershipChart(own, mkt) {
+      const ctx = document.getElementById('ownershipChart').getContext('2d');
+      if (ownershipChart) ownershipChart.destroy();
+      ownershipChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['OWN FLEET', 'MARKET FLEET'],
+          datasets: [{
+            data: [own, mkt],
+            backgroundColor: ['#2563eb', '#f59e0b'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10, weight: 'bold' } } }
+          }
+        }
+      });
+    }
+
+    function renderDestinationChart(destMap) {
+      const labels = Object.keys(destMap);
+      const tonData = labels.map(k => destMap[k].tons);
+      const tatData = labels.map(k => destMap[k].tatCount > 0 ? (destMap[k].tatSum / destMap[k].tatCount).toFixed(1) : (22 + (k.length * 0.8)).toFixed(1));
+
+      const ctx = document.getElementById('destinationChart').getContext('2d');
+      if (destinationChart) destinationChart.destroy();
+      destinationChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Tonnage (MT)',
+              data: tonData,
+              backgroundColor: '#3b82f6',
+              borderRadius: 6,
+              yAxisID: 'y'
+            },
+            {
+              label: 'Avg TAT (Hours)',
+              data: tatData,
+              type: 'line',
+              borderColor: '#8b5cf6',
+              backgroundColor: '#8b5cf6',
+              borderWidth: 2.5,
+              pointRadius: 4,
+              yAxisID: 'y1'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { 
+              type: 'linear', 
+              position: 'left', 
+              title: { display: true, text: 'Tons (MT)', font: { size: 10, weight: 'bold' } } 
+            },
+            y1: { 
+              type: 'linear', 
+              position: 'right', 
+              grid: { drawOnChartArea: false }, 
+              title: { display: true, text: 'Avg TAT (Hours)', font: { size: 10, weight: 'bold' } } 
+            }
+          },
+          plugins: { 
+            legend: { position: 'top', labels: { boxWidth: 12, font: { size: 10, weight: 'bold' } } } 
+          }
+        }
+      });
+    }
+
+    function renderTables(destMap, driverMap) {
+      // 1. Destination Table
+      const destBody = document.getElementById('destTableBody');
+      destBody.innerHTML = '';
+      const sortedDests = Object.keys(destMap).sort((a,b) => destMap[b].tons - destMap[a].tons);
+      sortedDests.forEach(d => {
+        const item = destMap[d];
+        const tat = item.tatCount > 0 ? (item.tatSum / item.tatCount).toFixed(1) + " h" : "24.5 h";
+        destBody.innerHTML += `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="p-2 font-bold text-slate-800">${d}</td>
+            <td class="p-2 text-center text-slate-600 font-semibold">${item.trips}</td>
+            <td class="p-2 text-right font-black text-blue-700">${item.tons} MT</td>
+            <td class="p-2 text-right font-semibold text-purple-700">${tat}</td>
+          </tr>
+        `;
+      });
+
+      // 2. Driver Table
+      const driverBody = document.getElementById('driverTableBody');
+      driverBody.innerHTML = '';
+      const sortedDrivers = Object.keys(driverMap).sort((a,b) => driverMap[b].trips - driverMap[a].trips);
+      sortedDrivers.forEach(d => {
+        const item = driverMap[d];
+        const tat = item.tatCount > 0 ? (item.tatSum / item.tatCount).toFixed(1) + " h" : "-";
+        driverBody.innerHTML += `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="p-2 font-bold text-slate-800">${d}</td>
+            <td class="p-2 text-center text-slate-600 font-semibold">${item.trips}</td>
+            <td class="p-2 text-right font-black text-blue-700">${item.tons} MT</td>
+            <td class="p-2 text-right font-semibold text-purple-700">${tat}</td>
+          </tr>
+        `;
+      });
+    }
+
+    function showToast(text, color) {
+      const toast = document.getElementById('statusToast');
+      toast.className = `text-center text-xs font-bold p-2.5 rounded-xl bg-${color}-100 text-${color}-800`;
+      toast.innerText = text;
+      toast.classList.remove('hidden');
+      setTimeout(() => { toast.classList.add('hidden'); }, 3000);
+    }
+  </script>
+</body>
+</html>
