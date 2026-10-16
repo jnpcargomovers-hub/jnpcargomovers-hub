@@ -1,818 +1,143 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <title>JNP Cargo Movers - Operations & Dispatch Cockpit</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-  <style>
-    body {
-      -webkit-tap-highlight-color: transparent;
-      padding-bottom: env(safe-area-inset-bottom, 24px);
-    }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#022A5B">
+  <title>JNP Central Hub</title>
+  <link rel="icon" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="stylesheet" href="jnp.css">
+  <script src="jnp.js"></script>
 </head>
-<body class="bg-slate-100 text-slate-800 antialiased min-h-screen p-3 sm:p-6">
+<body>
 
-  <div class="max-w-7xl mx-auto space-y-4">
-
-    <!-- Top Navigation / Header -->
-    <header class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-      <div class="flex items-center gap-3">
-        <div class="flex-shrink-0">
-          <img 
-            id="dashLogo" 
-            src="logo.png" 
-            alt="JNP Cargo Movers" 
-            class="h-11 w-auto object-contain"
-            onerror="document.getElementById('dashLogo').classList.add('hidden'); document.getElementById('dashFallback').classList.remove('hidden');"
-          />
-          <div id="dashFallback" class="hidden h-11 w-14 bg-blue-950 rounded-xl flex flex-col items-center justify-center text-white shadow-sm">
-            <span class="font-black text-sm italic tracking-tighter leading-none">JNP</span>
-            <span class="text-[7px] font-bold text-amber-400 tracking-wider">CARGO</span>
-          </div>
-        </div>
-        <div class="border-l border-slate-200 pl-3">
-          <h1 class="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase leading-none">Operations Cockpit</h1>
-          <p class="text-xs text-slate-500 font-semibold mt-1">Live Fleet, Indent Reconciliation & Driver TAT Analytics</p>
-        </div>
+  <!-- LOGIN -->
+  <div id="loginView" class="wrap login hidden">
+    <div class="brand"><img id="loginLogo" alt="JNP Cargo Movers"></div>
+    <div class="stripe"></div>
+    <h1>Central Hub</h1>
+    <p class="sub">JNP Cargo Movers · सेंट्रल हब</p>
+    <form id="loginForm" class="card" autocomplete="on">
+      <div class="field">
+        <label for="mobile">Mobile Number <span class="hi">· मोबाइल नंबर</span></label>
+        <input id="mobile" class="input" type="tel" inputmode="numeric" maxlength="14" placeholder="10-digit mobile" required autocomplete="tel">
       </div>
-
-      <!-- Date Filter & Master Sync Controls -->
-      <div class="flex flex-wrap items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 w-full sm:w-auto justify-between sm:justify-start">
-        <div class="flex items-center gap-1.5">
-          <span class="text-xs font-bold text-slate-600 uppercase">
-            <i class="fa-regular fa-calendar-days text-blue-600 mr-1"></i> Date:
-          </span>
-          <input type="date" id="startDate" class="bg-white border border-slate-300 text-xs rounded-lg p-1.5 font-semibold text-slate-800" onchange="applyFilters()" />
-          <span class="text-xs text-slate-400 font-bold">to</span>
-          <input type="date" id="endDate" class="bg-white border border-slate-300 text-xs rounded-lg p-1.5 font-semibold text-slate-800" onchange="applyFilters()" />
-        </div>
-        <div class="flex items-center gap-1.5">
-          <button type="button" onclick="resetFilters()" class="px-2.5 py-1.5 bg-slate-200 text-slate-700 text-xs font-bold rounded-lg hover:bg-slate-300 transition">Reset</button>
-          <button type="button" onclick="loadLiveSheetData()" id="refreshBtn" class="px-2.5 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition flex items-center gap-1">
-            <i class="fa-solid fa-arrows-rotate text-[10px]" id="refreshIcon"></i>
-            <span>Sync</span>
-          </button>
-        </div>
+      <div class="field">
+        <label for="code">Entry Code <span class="hi">· एंट्री कोड</span></label>
+        <input id="code" class="input" type="password" inputmode="numeric" maxlength="12" placeholder="Code given by HO" required autocomplete="current-password">
       </div>
-    </header>
-
-    <!-- Global Dimension Filters: Driver, Vehicle Type (LCV vs Truck), Cargo (Bag vs Bulk) -->
-    <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200 grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs font-semibold">
-      <div>
-        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Driver Filter</label>
-        <select id="filterDriver" onchange="applyFilters()" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-bold text-slate-800">
-          <option value="ALL">All Drivers (Fleet Overview)</option>
-        </select>
-      </div>
-      <div>
-        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Body Type</label>
-        <select id="filterBody" onchange="applyFilters()" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-bold text-slate-800">
-          <option value="ALL">All Body Types (LCV + Truck)</option>
-          <option value="LCV">LCV Only (<= 12T)</option>
-          <option value="TRUCK">Heavy Truck / Trailer (> 12T)</option>
-        </select>
-      </div>
-      <div>
-        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Cargo Type</label>
-        <select id="filterCargo" onchange="applyFilters()" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-bold text-slate-800">
-          <option value="ALL">All Cargo (Bag & Bulk)</option>
-          <option value="BAG">Bagged Cement Only</option>
-          <option value="BULK">Bulk Bulk / Bulker Only</option>
-        </select>
-      </div>
-      <div>
-        <label class="block text-[10px] uppercase font-bold text-slate-400 mb-1">Fleet Segment</label>
-        <select id="filterOwnership" onchange="applyFilters()" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-bold text-slate-800">
-          <option value="ALL">All Fleet (Own + Market)</option>
-          <option value="OWN">Own Fleet Only</option>
-          <option value="MARKET">Market Partner Only</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Active Driver Focus Banner (Appears when a single driver is selected) -->
-    <div id="driverBanner" class="hidden bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-4 text-white shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-      <div>
-        <div class="flex items-center gap-2">
-          <span class="px-2 py-0.5 rounded bg-amber-400 text-slate-900 text-[10px] font-black uppercase">Driver Mode</span>
-          <h2 id="bannerDriverName" class="text-lg font-black uppercase tracking-wide">DRIVER NAME</h2>
-        </div>
-        <p id="bannerDriverSummary" class="text-xs text-blue-200 mt-1">Performance breakdown for selected period</p>
-      </div>
-      <button onclick="clearDriverFilter()" class="text-xs font-bold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg border border-white/20 transition">
-        Clear Driver Filter <i class="fa-solid fa-xmark ml-1"></i>
-      </button>
-    </div>
-
-    <!-- Top Scorecards Grid (Includes Qty Dispatched vs Delivered Reconciliation) -->
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-      <!-- 1. Dispatched Tonnage -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
-        <div class="w-11 h-11 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-lg flex-shrink-0">
-          <i class="fa-solid fa-weight-hanging"></i>
-        </div>
-        <div>
-          <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Dispatched</p>
-          <h3 id="cardTotalTons" class="text-lg sm:text-xl font-black text-slate-900 mt-0.5">0 MT</h3>
-        </div>
-      </div>
-
-      <!-- 2. Actual Delivered Tonnage & Reconciliation -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
-        <div class="w-11 h-11 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center text-lg flex-shrink-0">
-          <i class="fa-solid fa-clipboard-check"></i>
-        </div>
-        <div>
-          <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Delivered</p>
-          <h3 id="cardDeliveredTons" class="text-lg sm:text-xl font-black text-slate-900 mt-0.5">0 MT</h3>
-          <p id="cardDeliveredVariance" class="text-[10px] font-bold text-slate-400">Var: 0 MT</p>
-        </div>
-      </div>
-
-      <!-- 3. Trips -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
-        <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-lg flex-shrink-0">
-          <i class="fa-solid fa-truck-ramp-box"></i>
-        </div>
-        <div>
-          <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Dispatches</p>
-          <h3 id="cardTotalTrips" class="text-lg sm:text-xl font-black text-slate-900 mt-0.5">0 Trips</h3>
-        </div>
-      </div>
-
-      <!-- 4. Average TAT -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
-        <div class="w-11 h-11 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center text-lg flex-shrink-0">
-          <i class="fa-solid fa-stopwatch-20"></i>
-        </div>
-        <div>
-          <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Average TAT</p>
-          <h3 id="cardAvgTat" class="text-lg sm:text-xl font-black text-slate-900 mt-0.5">0.0 Hrs</h3>
-        </div>
-      </div>
-
-      <!-- 5. Diesel Issued -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 col-span-2 md:col-span-1">
-        <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-lg flex-shrink-0">
-          <i class="fa-solid fa-gas-pump"></i>
-        </div>
-        <div>
-          <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Diesel Issued</p>
-          <h3 id="cardTotalDiesel" class="text-lg sm:text-xl font-black text-slate-900 mt-0.5">0 Ltr</h3>
-        </div>
-      </div>
-    </div>
-
-    <!-- Charts Row: Own vs Market (Bag vs Bulk Split) & Corridor Analytics -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-      <!-- Own vs Market with Bag vs Bulk Sub-split -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-        <div class="flex justify-between items-center mb-2">
-          <h2 class="text-xs font-black uppercase tracking-wider text-slate-700">Ownership & Cargo Mix</h2>
-          <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold">Bag vs Bulk</span>
-        </div>
-        <div class="h-48 relative flex items-center justify-center">
-          <canvas id="ownershipChart"></canvas>
-        </div>
-        <!-- Fleet Matrix Summary Pill Breakdown -->
-        <div class="mt-3 pt-3 border-t border-slate-100 space-y-1.5 text-xs">
-          <div class="flex justify-between items-center">
-            <span class="text-slate-500 font-semibold flex items-center gap-1.5">
-              <span class="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span> Own Fleet (Bag)
-            </span>
-            <span id="statOwnBag" class="font-black text-slate-800">0 MT</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="text-slate-500 font-semibold flex items-center gap-1.5">
-              <span class="w-2.5 h-2.5 rounded-full bg-indigo-400 inline-block"></span> Own Fleet (Bulk)
-            </span>
-            <span id="statOwnBulk" class="font-black text-slate-800">0 MT</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="text-slate-500 font-semibold flex items-center gap-1.5">
-              <span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> Market Fleet (Bag)
-            </span>
-            <span id="statMktBag" class="font-black text-slate-800">0 MT</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="text-slate-500 font-semibold flex items-center gap-1.5">
-              <span class="w-2.5 h-2.5 rounded-full bg-amber-300 inline-block"></span> Market Fleet (Bulk)
-            </span>
-            <span id="statMktBulk" class="font-black text-slate-800">0 MT</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Corridor Analytics & Dispatched vs Delivered Comparison -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm md:col-span-2">
-        <div class="flex justify-between items-center mb-3">
-          <h2 class="text-xs font-black uppercase tracking-wider text-slate-700">Corridor Performance (Tons & TAT)</h2>
-          <span class="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold">Route Efficiency</span>
-        </div>
-        <div class="h-64">
-          <canvas id="destinationChart"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <!-- Comparative Matrix: Driver x Location Graphic Comparison -->
-    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 pb-3">
-        <div>
-          <h2 class="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-            <i class="fa-solid fa-code-compare text-blue-600"></i> Driver × Location Corridor Benchmark
-          </h2>
-          <p class="text-[11px] text-slate-500 font-medium">Isolate a driver and route to observe specific turnaround performance</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <select id="matrixDriverSelect" onchange="renderMatrixChart()" class="bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs font-bold text-slate-800">
-            <option value="ALL">All Drivers</option>
-          </select>
-          <select id="matrixDestSelect" onchange="renderMatrixChart()" class="bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs font-bold text-slate-800">
-            <option value="ALL">All Destinations</option>
-          </select>
-        </div>
-      </div>
-      <div class="h-64">
-        <canvas id="driverLocationMatrixChart"></canvas>
-      </div>
-    </div>
-
-    <!-- Tables Row: Corridor Level & Driver Performance Logs -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-      
-      <!-- Destination Table -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-        <h2 class="text-xs font-black uppercase tracking-wider text-slate-700 mb-3 flex items-center justify-between">
-          <span>Destination Analytics</span>
-          <span class="text-[10px] text-slate-400 font-semibold">Sorted by Tons</span>
-        </h2>
-        <div class="overflow-x-auto max-h-72">
-          <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 text-slate-500 font-bold border-b">
-              <tr>
-                <th class="p-2">Destination</th>
-                <th class="p-2 text-center">Trips</th>
-                <th class="p-2 text-right">Dispatched</th>
-                <th class="p-2 text-right">Delivered</th>
-                <th class="p-2 text-right">Avg TAT</th>
-              </tr>
-            </thead>
-            <tbody id="destTableBody" class="divide-y divide-slate-100 font-medium"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Driver Table (Clickable to isolate specific driver) -->
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-        <h2 class="text-xs font-black uppercase tracking-wider text-slate-700 mb-3 flex items-center justify-between">
-          <span>Driver Performance & Turnaround</span>
-          <span class="text-[10px] text-blue-600 font-semibold cursor-pointer">Click driver to isolate</span>
-        </h2>
-        <div class="overflow-x-auto max-h-72">
-          <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 text-slate-500 font-bold border-b">
-              <tr>
-                <th class="p-2">Driver Name</th>
-                <th class="p-2 text-center">Trips</th>
-                <th class="p-2 text-right">Tonnage</th>
-                <th class="p-2 text-right">Delivered</th>
-                <th class="p-2 text-right">Avg TAT</th>
-              </tr>
-            </thead>
-            <tbody id="driverTableBody" class="divide-y divide-slate-100 font-medium"></tbody>
-          </table>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Toast Notification -->
-    <div id="statusToast" class="hidden text-center text-xs font-bold p-2.5 rounded-xl"></div>
-
+      <div id="loginErr" class="err hidden"></div>
+      <button id="loginBtn" class="btn orange" type="submit">Login · लॉगिन</button>
+      <p class="hint center" style="margin-top:12px">You stay logged in on this phone for 30 days.</p>
+    </form>
+    <p class="footnote">Forgot your code? Ask HO.</p>
   </div>
 
-  <script>
-    // Paste your Google Apps Script Web App Deployment URL here:
-    const MASTER_API_URL = "https://script.google.com/macros/s/AKfycbzpcg4WeGa3kB4y94xBrG5_Znrp14da-LHymUcC6blZ3Lxe89ze6RMTCijmeRqAMKKl1Q/exec";
+  <!-- HOME -->
+  <div id="homeView" class="hidden">
+    <div id="hdr"></div>
+    <div class="wrap">
+      <div class="hero">
+        <button class="logout" id="logoutBtn" type="button">Logout</button>
+        <div class="hi1" id="greet">Namaste</div>
+        <div class="nm" id="uName"></div>
+        <div class="rl" id="uRole"></div>
+        <div class="stats" id="stats"></div>
+      </div>
+      <a class="punch hidden" id="punch" href="attendance/"><span class="dot"></span><span><b id="pT">Attendance</b><small id="pS"></small></span><span class="go" id="pGo">Punch IN</span></a>
+      <div id="sections"></div>
+      <p class="footnote">J N P Cargo Movers Pvt Ltd · Built on Trust, Driven with Purpose</p>
+    </div>
+  </div>
 
-    // Master Fleet Registry (Populated with Body Type & Cargo Type from Vehicle Master)
-    let VEHICLE_MASTER = {
-      "MH40CM1570": { cap: 31, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH40CM1550": { cap: 31, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "UP95T9393":  { cap: 31, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH40CM8975": { cap: 31, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH40CD4841": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH40CM7805": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH14KA9717": { cap: 12, own: "MARKET", cargo: "BAG", body: "LCV" },
-      "UP70HT0115": { cap: 31, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "AP04UB2935": { cap: 25, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH40CM1569": { cap: 25, own: "MARKET", cargo: "BAG", body: "TRUCK" },
-      "MH40BL4725": { cap: 34, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "OD01AB2773": { cap: 31, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "OD01AB2873": { cap: 31, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "OD04M6659":  { cap: 31, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH18BG8250": { cap: 35, own: "OWN", cargo: "BULK", body: "TRUCK" },
-      "MH18BG8251": { cap: 35, own: "OWN", cargo: "BULK", body: "TRUCK" },
-      "MH18BG8252": { cap: 35, own: "OWN", cargo: "BULK", body: "TRUCK" },
-      "MH18BG8253": { cap: 35, own: "OWN", cargo: "BULK", body: "TRUCK" },
-      "MH18BG8256": { cap: 35, own: "OWN", cargo: "BULK", body: "TRUCK" },
-      "MH18BG8257": { cap: 35, own: "OWN", cargo: "BULK", body: "TRUCK" },
-      "CG07CG1594": { cap: 12, own: "OWN", cargo: "BAG", body: "LCV" },
-      "CG07CG1595": { cap: 12, own: "OWN", cargo: "BAG", body: "LCV" },
-      "CG07CG1596": { cap: 12, own: "OWN", cargo: "BAG", body: "LCV" },
-      "CG07CG1597": { cap: 12, own: "MARKET", cargo: "BAG", body: "LCV" },
-      "CG07CG2120": { cap: 12, own: "OWN", cargo: "BAG", body: "LCV" },
-      "MH18BZ0105": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH18BZ0106": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH18BZ0107": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH18BZ0108": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH18BZ0109": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH18BZ0110": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH21BH4147": { cap: 12, own: "MARKET", cargo: "BAG", body: "LCV" },
-      "MH18BZ0112": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH18BZ0113": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH18BZ0267": { cap: 42, own: "OWN", cargo: "BULK", body: "TRUCK" },
-      "MH18BZ0268": { cap: 42, own: "OWN", cargo: "BULK", body: "TRUCK" },
-      "MH18BZ0269": { cap: 42, own: "OWN", cargo: "BULK", body: "TRUCK" },
-      "MH40CM0731": { cap: 12, own: "MARKET", cargo: "BAG", body: "LCV" },
-      "MH18BZ0270": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH18BZ0271": { cap: 42, own: "OWN", cargo: "BULK", body: "TRUCK" },
-      "MH18BZ0272": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH18BZ0273": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH18BZ0274": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH18BZ0275": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH18BZ0276": { cap: 42, own: "OWN", cargo: "BULK", body: "TRUCK" },
-      "MH40CM2746": { cap: 42, own: "OWN", cargo: "BULK", body: "TRUCK" },
-      "MH40CM2747": { cap: 42, own: "OWN", cargo: "BULK", body: "TRUCK" },
-      "MH40CM2748": { cap: 42, own: "OWN", cargo: "BAG", body: "TRUCK" },
-      "MH40DC1236": { cap: 12, own: "MARKET", cargo: "BAG", body: "LCV" }
-    };
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const roleNames = { Loader: 'Loader', Ops_Head: 'Operations Head', 'R&M_Head': 'R&M Head', Fin_Head: 'Finance Head', CEO: 'CEO', Dir_1: 'Director', Dir_2: 'Director', Office: 'Head Office' };
 
-    // Loader Entries with Actual Delivered Quantities mapped from Indent by LR Number
-    let LOADER_RECORDS = [
-      { id:"LOD-01", date:"2026-10-10", time:"00:35:39", lr:"A21219", truck:"MH18BZ0113", driver:"SUNIL SAHU", dest:"NASHIK", diesel:150, delDate:null, delQty:42 },
-      { id:"LOD-02", date:"2026-10-10", time:"10:35:43", lr:"A21220", truck:"MH18BZ0108", driver:"Md Miraj", dest:"KARODI", diesel:190, delDate:null, delQty:42 },
-      { id:"LOD-03", date:"2026-10-10", time:"12:09:21", lr:"A21221", truck:"CG07CG1595", driver:"MEHAMOOD KHAN", dest:"PATONDA", diesel:0, delDate:null, delQty:12 },
-      { id:"LOD-04", date:"2026-10-10", time:"13:34:53", lr:"A21222", truck:"MH14KA9717", driver:"Kailash Patil", dest:"PATONDA", diesel:0, delDate:"2026-10-11 18:55:30", delQty:12 },
-      { id:"LOD-05", date:"2026-10-10", time:"15:07:21", lr:"A21123", truck:"MH21BH4147", driver:"Sharukh Khtik", dest:"PALDHI", diesel:0, delDate:null, delQty:12 },
-      { id:"LOD-06", date:"2026-10-10", time:"16:07:44", lr:"A21224", truck:"CG07CG2120", driver:"SAMADHANBHIL", dest:"SHIRPUR", diesel:0, delDate:"2026-10-11 16:22:23", delQty:12 },
-      { id:"LOD-07", date:"2026-10-10", time:"17:42:07", lr:"A21225", truck:"MH40CM0731", driver:"Ishwar Bhill", dest:"AMALNER", diesel:0, delDate:"2026-10-11 18:19:25", delQty:12 },
-      { id:"LOD-08", date:"2026-10-10", time:"18:03:00", lr:"A21226", truck:"MH18BZ0107", driver:"PRADIPKUMAR", dest:"MALEGAON", diesel:150, delDate:null, delQty:42 },
-      { id:"LOD-09", date:"2026-10-10", time:"20:19:42", lr:"A21227", truck:"CG07CG1594", driver:"AJAY BHIL", dest:"LASURCHOPDA", diesel:0, delDate:null, delQty:12 },
-      { id:"LOD-10", date:"2026-10-10", time:"22:15:37", lr:"A21T5",   truck:"MH18BZ0112", driver:"Ranjit Soni", dest:"NASHIK", diesel:150, delDate:null, delQty:42 },
-      { id:"LOD-11", date:"2026-10-10", time:"23:55:10", lr:"A21228", truck:"MH18BZ0109", driver:"Md Sagar", dest:"DHULE", diesel:150, delDate:null, delQty:42 },
-      { id:"LOD-12", date:"2026-10-11", time:"02:18:29", lr:"A21229", truck:"MH18BZ0105", driver:"Rahul Pal", dest:"DEOPUR", diesel:150, delDate:null, delQty:42 },
-      { id:"LOD-13", date:"2026-10-11", time:"03:22:26", lr:"A21230", truck:"MH18BZ0269", driver:"RAMLAKHAN SAHU", dest:"NASHIK", diesel:150, delDate:null, delQty:42 },
-      { id:"LOD-14", date:"2026-10-11", time:"04:47:11", lr:"A21231", truck:"MH18BZ0106", driver:"Rajesh Sahu", dest:"DEOPUR", diesel:150, delDate:null, delQty:42 },
-      { id:"LOD-15", date:"2026-10-11", time:"06:23:43", lr:"A21232", truck:"MH18BZ0268", driver:"ANIL MISHRA", dest:"KOPARGAON", diesel:150, delDate:null, delQty:42 },
-      { id:"LOD-16", date:"2026-10-11", time:"09:37:34", lr:"A21233", truck:"MH40CM1570", driver:"BHATU MAHALE", dest:"MALEGAON", diesel:150, delDate:null, delQty:30 },
-      { id:"LOD-17", date:"2026-10-11", time:"11:06:58", lr:"A21234", truck:"MH40CM1550", driver:"DEVIDAS PATIL", dest:"NASHIK", diesel:150, delDate:null, delQty:31 },
-      { id:"LOD-18", date:"2026-10-11", time:"11:51:29", lr:"A21235", truck:"MH40CM8975", driver:"SANJAY KHABRE", dest:"NASHIK", diesel:150, delDate:null, delQty:31 },
-      { id:"LOD-19", date:"2026-10-11", time:"12:47:06", lr:"A21236", truck:"MH40CM2747", driver:"Sintu Yadav", dest:"CHIKHALTHANA", diesel:150, delDate:null, delQty:42 },
-      { id:"LOD-20", date:"2026-10-11", time:"14:38:22", lr:"A21237", truck:"MH40CM2746", driver:"Tinku Yadav", dest:"CHIKHALTHANA", diesel:150, delDate:null, delQty:42 },
-      { id:"LOD-21", date:"2026-10-11", time:"15:02:44", lr:"A21238", truck:"MH18BZ0267", driver:"PRAVIN BHOI", dest:"NASHIK", diesel:150, delDate:null, delQty:42 },
-      { id:"LOD-22", date:"2026-10-11", time:"15:32:04", lr:"A21239", truck:"CG07CG1597", driver:"LAKHAN PAWAR", dest:"AMALNER", diesel:0, delDate:null, delQty:12 },
-      { id:"LOD-23", date:"2026-10-11", time:"16:16:08", lr:"A21240", truck:"MH14KA9717", driver:"Kailash Patil", dest:"PATONDA", diesel:0, delDate:null, delQty:12 },
-      { id:"LOD-24", date:"2026-10-11", time:"16:47:18", lr:"A21241", truck:"CG07CG1595", driver:"MEHAMOOD KHAN", dest:"TAMASWADI", diesel:0, delDate:null, delQty:12 },
-      { id:"LOD-25", date:"2026-10-11", time:"17:59:58", lr:"A21242", truck:"CG07CG2120", driver:"SAMADHANBHIL", dest:"TAMASWADI", diesel:0, delDate:null, delQty:12 },
-      { id:"LOD-26", date:"2026-10-11", time:"18:50:09", lr:"A21243", truck:"MH40CM0731", driver:"Ishwar Bhill", dest:"SHIRPUR", diesel:0, delDate:null, delQty:12 },
-      { id:"LOD-27", date:"2026-10-11", time:"20:12:12", lr:"A21244", truck:"CG07CG1594", driver:"AJAY BHIL", dest:"PAROLA", diesel:0, delDate:null, delQty:12 },
-      { id:"LOD-28", date:"2026-10-11", time:"20:53:23", lr:"A21245", truck:"MH18BZ0271", driver:"Ashok Sahu", dest:"NASHIK", diesel:150, delDate:null, delQty:42 },
-      { id:"LOD-29", date:"2026-10-11", time:"21:40:48", lr:"A21246", truck:"MH18BZ0272", driver:"Sunil Sahu", dest:"NASHIK", diesel:150, delDate:null, delQty:42 }
-    ];
+  function showLogin() {
+    $('homeView').classList.add('hidden'); $('loginView').classList.remove('hidden');
+    $('loginLogo').src = JNP.CONFIG.LOGO; setTimeout(() => $('mobile').focus(), 50);
+  }
+  $('loginForm').addEventListener('submit', async e => {
+    e.preventDefault(); $('loginErr').classList.add('hidden');
+    const btn = $('loginBtn'); btn.disabled = true; btn.textContent = 'Checking…';
+    try {
+      const out = await JNP.login($('mobile').value, $('code').value);
+      if (!out.ok) throw new Error(out.error);
+      const next = JNP.param('next');
+      if (next && next.indexOf(JNP.CONFIG.HUB) === 0) { location.href = next; return; }
+      history.replaceState(null, '', JNP.CONFIG.HUB); showHome();
+    } catch (err) { $('loginErr').textContent = err.message; $('loginErr').classList.remove('hidden'); }
+    finally { btn.disabled = false; btn.textContent = 'Login · लॉगिन'; }
+  });
 
-    let ownershipChart = null;
-    let destinationChart = null;
-    let matrixChart = null;
+  const APPROVAL = ['OPS-04', 'OPS-05', 'RM-03', 'RM-04', 'FIN-01', 'FIN-03', 'APR-01'];
+  function tag(r, code) {
+    if (r.indexOf('P') >= 0) return '<span class="pill warn">Pay</span>';
+    if (r.indexOf('A') >= 0 && APPROVAL.indexOf(code) >= 0) return '<span class="pill ok">Approve</span>';
+    if (r.indexOf('E') >= 0) return '';
+    return '<span class="pill">View only</span>';
+  }
+  function tileHtml(code, color, badge) {
+    const s = JNP.session(), a = s.access[code], m = JNP.MODULES[code] || { icon: '▪️', path: '' };
+    return '<a class="tile" style="--accent:' + color + '" href="' + JNP.CONFIG.HUB + m.path + '">' + (badge ? '<span class="badge">' + badge + '</span>' : '') +
+      '<span class="ic">' + m.icon + '</span><span class="en">' + JNP.esc(a.name) + '</span><span class="hi">' + JNP.esc(a.hindi) + '</span><span class="tag">' + tag(JNP.rights(code), code) + '</span></a>';
+  }
 
-    window.addEventListener('DOMContentLoaded', async () => {
-      document.getElementById('startDate').value = "2026-10-01";
-      document.getElementById('endDate').value = "2026-10-31";
+  function render() {
+    const s = JNP.session(), c = s.counts || {}, u = s.user;
+    const h = new Date().getHours();
+    $('greet').textContent = h < 12 ? 'Good morning · सुप्रभात' : h < 17 ? 'Good afternoon · नमस्ते' : 'Good evening · शुभ संध्या';
+    $('uName').textContent = u.name;
+    $('uRole').textContent = (roleNames[u.role] || u.role) + ' · ' + u.level;
+    const st = [];
+    if (JNP.rights('APR-01').length) {
+      st.push(['approvals/?view=toMe', c.toApprove || 0, 'To approve', c.toApprove > 0]);
+      if (JNP.can('FIN-01', 'P') || JNP.can('OPS-05', 'P') || JNP.can('RM-03', 'P')) st.push(['approvals/?view=toPay', c.toPay || 0, 'To pay', c.toPay > 0]);
+      st.push(['approvals/?view=mine', c.myPending || 0, 'My requests', false]);
+      if (u.level === 'Level 1') st.push(['approvals/?view=all', c.allPending || 0, 'All pending', false]);
+    }
+    $('stats').innerHTML = st.slice(0, 3).map(x => '<a class="stat' + (x[3] ? ' hot' : '') + '" href="' + x[0] + '"><b>' + x[1] + '</b><span>' + x[2] + '</span></a>').join('');
+    $('stats').classList.toggle('hidden', !st.length);
 
-      populateDriverFilterOptions();
-      populateMatrixDropdowns();
-      applyFilters();
+    if (JNP.rights('ATT-01').length) {
+      $('punch').classList.remove('hidden'); $('punch').classList.toggle('in', !!c.punchedIn);
+      $('pT').textContent = c.punchedIn ? 'On duty · ड्यूटी पर' : 'Not punched in · हाज़िरी लगाएँ';
+      $('pS').textContent = c.lastPunch ? 'Last punch ' + JNP.dmy(c.lastPunch) : 'Selfie + location';
+      $('pGo').textContent = c.punchedIn ? 'Punch OUT' : 'Punch IN';
+    }
 
-      if (!MASTER_API_URL.includes("PASTE_YOUR")) {
-        await loadLiveSheetData();
-      }
+    let html = '';
+    const order = Object.keys(JNP.MODULES);
+    JNP.TILES.forEach(dept => {
+      const codes = order.filter(cd => cd.indexOf(dept.prefix) === 0 && s.access[cd] && JNP.rights(cd).length);
+      if (!codes.length) return;
+      html += '<div class="section"><h2 style="color:' + dept.color + '"><span class="dot" style="background:' + dept.color + '"></span>' + JNP.esc(dept.name) + ' <small>' + dept.hindi + '</small></h2><div class="tiles">' +
+        codes.map(cd => tileHtml(cd, dept.color)).join('') + '</div></div>';
     });
-
-    function populateDriverFilterOptions() {
-      const select = document.getElementById('filterDriver');
-      const drivers = [...new Set(LOADER_RECORDS.map(r => (r.driver || '').toUpperCase().trim()))].sort();
-      select.innerHTML = '<option value="ALL">All Drivers (Fleet Overview)</option>';
-      drivers.forEach(d => {
-        if (d) select.innerHTML += `<option value="${d}">${d}</option>`;
-      });
+    const gen = ['APR-01', 'ATT-01'].filter(cd => s.access[cd] && JNP.rights(cd).length);
+    if (gen.length || u.level !== 'Level 3') {
+      html += '<div class="section"><h2 style="color:var(--navy)"><span class="dot" style="background:var(--navy)"></span>General <small>सामान्य</small></h2><div class="tiles">' +
+        gen.map(cd => tileHtml(cd, 'var(--gen)', cd === 'APR-01' ? (c.toApprove || 0) + (c.toPay || 0) : 0)).join('') +
+        (u.level !== 'Level 3' ? '<a class="tile" style="--accent:var(--orange)" href="' + JNP.CONFIG.DASHBOARD + '"><span class="ic">📊</span><span class="en">Dashboard</span><span class="hi">डैशबोर्ड</span></a>' : '') +
+        '</div></div>';
     }
+    $('sections').innerHTML = html || '<div class="card center muted">No modules assigned to you yet. Ask HO.</div>';
+  }
 
-    function populateMatrixDropdowns() {
-      const driverSel = document.getElementById('matrixDriverSelect');
-      const destSel = document.getElementById('matrixDestSelect');
-
-      const drivers = [...new Set(LOADER_RECORDS.map(r => (r.driver || '').toUpperCase().trim()))].sort();
-      const dests = [...new Set(LOADER_RECORDS.map(r => (r.dest || '').toUpperCase().trim()))].sort();
-
-      driverSel.innerHTML = '<option value="ALL">All Drivers</option>';
-      drivers.forEach(d => { if (d) driverSel.innerHTML += `<option value="${d}">${d}</option>`; });
-
-      destSel.innerHTML = '<option value="ALL">All Destinations</option>';
-      dests.forEach(ds => { if (ds) destSel.innerHTML += `<option value="${ds}">${ds}</option>`; });
-    }
-
-    function resetFilters() {
-      document.getElementById('startDate').value = "2026-10-01";
-      document.getElementById('endDate').value = "2026-10-31";
-      document.getElementById('filterDriver').value = "ALL";
-      document.getElementById('filterBody').value = "ALL";
-      document.getElementById('filterCargo').value = "ALL";
-      document.getElementById('filterOwnership').value = "ALL";
-      applyFilters();
-    }
-
-    function selectDriver(driverName) {
-      document.getElementById('filterDriver').value = driverName.toUpperCase().trim();
-      applyFilters();
-    }
-
-    function clearDriverFilter() {
-      document.getElementById('filterDriver').value = "ALL";
-      applyFilters();
-    }
-
-    async function loadLiveSheetData() {
-      if (MASTER_API_URL.includes("PASTE_YOUR")) {
-        showToast("Using offline cached records. Paste Apps Script URL to fetch live Google Sheet.", "blue");
-        return;
-      }
-
-      const icon = document.getElementById('refreshIcon');
-      icon.classList.add('fa-spin');
-
-      try {
-        const res = await fetch(`${MASTER_API_URL}?t=${Date.now()}`);
-        if (res.ok) {
-          const json = await res.json();
-          if (json.status === "success") {
-            if (json.vehicleMaster) VEHICLE_MASTER = json.vehicleMaster;
-            if (json.records) LOADER_RECORDS = json.records;
-            populateDriverFilterOptions();
-            populateMatrixDropdowns();
-            showToast("Synced with Google Sheet Master Hub!", "emerald");
-            applyFilters();
-          }
-        }
-      } catch (err) {
-        console.warn("Could not reach master sheet API. Retaining cache.", err);
-        showToast("Sync failed. Check Apps Script deployment.", "amber");
-      } finally {
-        icon.classList.remove('fa-spin');
-      }
-    }
-
-    function calculateRecordTAT(rec) {
-      if (!rec.delDate) return null;
-      const start = new Date(rec.date + "T" + rec.time);
-      const end = new Date(rec.delDate.replace(" ", "T"));
-      const diffHrs = (end - start) / (1000 * 60 * 60);
-      return diffHrs > 0 ? diffHrs : null;
-    }
-
-    function applyFilters() {
-      const startStr = document.getElementById('startDate').value;
-      const endStr = document.getElementById('endDate').value;
-      const selectedDriver = document.getElementById('filterDriver').value;
-      const selectedBody = document.getElementById('filterBody').value;
-      const selectedCargo = document.getElementById('filterCargo').value;
-      const selectedOwnership = document.getElementById('filterOwnership').value;
-
-      // Handle Driver Focus Banner
-      const banner = document.getElementById('driverBanner');
-      if (selectedDriver !== "ALL") {
-        banner.classList.remove('hidden');
-        document.getElementById('bannerDriverName').innerText = selectedDriver;
-      } else {
-        banner.classList.add('hidden');
-      }
-
-      const filtered = LOADER_RECORDS.filter(r => {
-        if (startStr && r.date < startStr) return false;
-        if (endStr && r.date > endStr) return false;
-
-        const dName = (r.driver || '').toUpperCase().trim();
-        if (selectedDriver !== "ALL" && dName !== selectedDriver) return false;
-
-        const cleanTruck = (r.truck || "").replace(/\s+/g, '').toUpperCase();
-        const vm = VEHICLE_MASTER[cleanTruck] || { cap: 12, own: "MARKET", cargo: "BAG", body: "LCV" };
-
-        if (selectedBody !== "ALL" && vm.body !== selectedBody) return false;
-        if (selectedCargo !== "ALL" && vm.cargo !== selectedCargo) return false;
-        if (selectedOwnership !== "ALL" && vm.own !== selectedOwnership) return false;
-
-        return true;
-      });
-
-      let totalDispatchedTons = 0;
-      let totalDeliveredTons = 0;
-      let totalTrips = filtered.length;
-      let totalDiesel = 0;
-      let tatSum = 0, tatCount = 0;
-
-      // Fleet Segment Matrix (Bag vs Bulk within Own vs Market)
-      let ownBagTons = 0, ownBulkTons = 0;
-      let mktBagTons = 0, mktBulkTons = 0;
-
-      const destMap = {};
-      const driverMap = {};
-
-      filtered.forEach(r => {
-        const cleanTruck = (r.truck || "").replace(/\s+/g, '').toUpperCase();
-        const vm = VEHICLE_MASTER[cleanTruck] || { cap: 12, own: "MARKET", cargo: "BAG", body: "LCV" };
-        const dispatchedTons = vm.cap || 12;
-        const deliveredTons = r.delQty != null ? Number(r.delQty) : dispatchedTons;
-
-        totalDispatchedTons += dispatchedTons;
-        totalDeliveredTons += deliveredTons;
-        totalDiesel += Number(r.diesel) || 0;
-
-        // Sub-splits
-        if (vm.own === "OWN") {
-          if (vm.cargo === "BULK") ownBulkTons += dispatchedTons;
-          else ownBagTons += dispatchedTons;
-        } else {
-          if (vm.cargo === "BULK") mktBulkTons += dispatchedTons;
-          else mktBagTons += dispatchedTons;
-        }
-
-        const tat = calculateRecordTAT(r);
-        if (tat) {
-          tatSum += tat;
-          tatCount++;
-        }
-
-        // Aggregate by Destination
-        const dDest = (r.dest || "UNKNOWN").toUpperCase();
-        if (!destMap[dDest]) destMap[dDest] = { trips: 0, dispatched: 0, delivered: 0, tatSum: 0, tatCount: 0 };
-        destMap[dDest].trips++;
-        destMap[dDest].dispatched += dispatchedTons;
-        destMap[dDest].delivered += deliveredTons;
-        if (tat) {
-          destMap[dDest].tatSum += tat;
-          destMap[dDest].tatCount++;
-        }
-
-        // Aggregate by Driver
-        const dName = (r.driver || "UNKNOWN").toUpperCase().trim();
-        if (!driverMap[dName]) driverMap[dName] = { trips: 0, dispatched: 0, delivered: 0, tatSum: 0, tatCount: 0 };
-        driverMap[dName].trips++;
-        driverMap[dName].dispatched += dispatchedTons;
-        driverMap[dName].delivered += deliveredTons;
-        if (tat) {
-          driverMap[dName].tatSum += tat;
-          driverMap[dName].tatCount++;
-        }
-      });
-
-      // Update KPI Scorecards
-      document.getElementById('cardTotalTons').innerText = totalDispatchedTons.toLocaleString() + " MT";
-      document.getElementById('cardDeliveredTons').innerText = totalDeliveredTons.toLocaleString() + " MT";
-      const variance = totalDeliveredTons - totalDispatchedTons;
-      const varEl = document.getElementById('cardDeliveredVariance');
-      varEl.innerText = `Var: ${variance >= 0 ? '+' : ''}${variance.toFixed(1)} MT`;
-      varEl.className = `text-[10px] font-bold ${variance < 0 ? 'text-rose-500' : 'text-emerald-600'}`;
-
-      document.getElementById('cardTotalTrips').innerText = totalTrips + " Trips";
-      document.getElementById('cardTotalDiesel').innerText = totalDiesel.toLocaleString() + " Ltr";
-      document.getElementById('cardAvgTat').innerText = (tatCount > 0 ? (tatSum / tatCount).toFixed(1) : "26.4") + " Hrs";
-
-      // Update Sub-segment breakdown text
-      document.getElementById('statOwnBag').innerText = ownBagTons.toLocaleString() + " MT";
-      document.getElementById('statOwnBulk').innerText = ownBulkTons.toLocaleString() + " MT";
-      document.getElementById('statMktBag').innerText = mktBagTons.toLocaleString() + " MT";
-      document.getElementById('statMktBulk').innerText = mktBulkTons.toLocaleString() + " MT";
-
-      if (selectedDriver !== "ALL") {
-        document.getElementById('bannerDriverSummary').innerText = `${totalTrips} Trips completed | Dispatched: ${totalDispatchedTons} MT | Delivered: ${totalDeliveredTons} MT | Avg TAT: ${(tatCount > 0 ? (tatSum / tatCount).toFixed(1) : "26.4")} Hrs`;
-      }
-
-      renderOwnershipChart(ownBagTons, ownBulkTons, mktBagTons, mktBulkTons);
-      renderDestinationChart(destMap);
-      renderTables(destMap, driverMap);
-      renderMatrixChart();
-    }
-
-    function renderOwnershipChart(ownBag, ownBulk, mktBag, mktBulk) {
-      const ctx = document.getElementById('ownershipChart').getContext('2d');
-      if (ownershipChart) ownershipChart.destroy();
-      ownershipChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Own Fleet (Bag)', 'Own Fleet (Bulk)', 'Market (Bag)', 'Market (Bulk)'],
-          datasets: [{
-            data: [ownBag, ownBulk, mktBag, mktBulk],
-            backgroundColor: ['#2563eb', '#818cf8', '#f59e0b', '#fde047'],
-            borderWidth: 2,
-            borderColor: '#ffffff'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false }
-          }
-        }
-      });
-    }
-
-    function renderDestinationChart(destMap) {
-      const labels = Object.keys(destMap);
-      const dispData = labels.map(k => destMap[k].dispatched);
-      const delData = labels.map(k => destMap[k].delivered);
-      const tatData = labels.map(k => destMap[k].tatCount > 0 ? (destMap[k].tatSum / destMap[k].tatCount).toFixed(1) : (22 + (k.length * 0.8)).toFixed(1));
-
-      const ctx = document.getElementById('destinationChart').getContext('2d');
-      if (destinationChart) destinationChart.destroy();
-      destinationChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: 'Dispatched (MT)',
-              data: dispData,
-              backgroundColor: '#3b82f6',
-              borderRadius: 4,
-              yAxisID: 'y'
-            },
-            {
-              label: 'Delivered (MT)',
-              data: delData,
-              backgroundColor: '#10b981',
-              borderRadius: 4,
-              yAxisID: 'y'
-            },
-            {
-              label: 'Avg TAT (Hours)',
-              data: tatData,
-              type: 'line',
-              borderColor: '#8b5cf6',
-              backgroundColor: '#8b5cf6',
-              borderWidth: 2.5,
-              pointRadius: 4,
-              yAxisID: 'y1'
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: { 
-              type: 'linear', 
-              position: 'left', 
-              title: { display: true, text: 'Tonnage (MT)', font: { size: 10, weight: 'bold' } } 
-            },
-            y1: { 
-              type: 'linear', 
-              position: 'right', 
-              grid: { drawOnChartArea: false }, 
-              title: { display: true, text: 'TAT (Hrs)', font: { size: 10, weight: 'bold' } } 
-            }
-          },
-          plugins: { 
-            legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10, weight: 'bold' } } } 
-          }
-        }
-      });
-    }
-
-    // Driver x Location Comparison Chart
-    function renderMatrixChart() {
-      const dSel = document.getElementById('matrixDriverSelect').value;
-      const locSel = document.getElementById('matrixDestSelect').value;
-
-      const subRecords = LOADER_RECORDS.filter(r => {
-        const dName = (r.driver || '').toUpperCase().trim();
-        const dDest = (r.dest || '').toUpperCase().trim();
-        if (dSel !== "ALL" && dName !== dSel) return false;
-        if (locSel !== "ALL" && dDest !== locSel) return false;
-        return true;
-      });
-
-      // Group by Pair: Driver @ Destination
-      const pairMap = {};
-      subRecords.forEach(r => {
-        const key = `${r.driver || 'UNKNOWN'} → ${r.dest || 'UNKNOWN'}`;
-        const cleanTruck = (r.truck || "").replace(/\s+/g, '').toUpperCase();
-        const vm = VEHICLE_MASTER[cleanTruck] || { cap: 12 };
-        const tons = vm.cap || 12;
-        const tat = calculateRecordTAT(r) || 24;
-
-        if (!pairMap[key]) pairMap[key] = { trips: 0, tons: 0, tatSum: 0 };
-        pairMap[key].trips++;
-        pairMap[key].tons += tons;
-        pairMap[key].tatSum += tat;
-      });
-
-      const pairs = Object.keys(pairMap).slice(0, 15); // Top 15 pairs
-      const tonsList = pairs.map(p => pairMap[p].tons);
-      const tatAvgList = pairs.map(p => (pairMap[p].tatSum / pairMap[p].trips).toFixed(1));
-
-      const ctx = document.getElementById('driverLocationMatrixChart').getContext('2d');
-      if (matrixChart) matrixChart.destroy();
-      matrixChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: pairs,
-          datasets: [
-            {
-              label: 'Delivered Tonnage (MT)',
-              data: tonsList,
-              backgroundColor: '#2563eb',
-              borderRadius: 4,
-              yAxisID: 'y'
-            },
-            {
-              label: 'Corridor TAT (Hrs)',
-              data: tatAvgList,
-              type: 'line',
-              borderColor: '#f59e0b',
-              backgroundColor: '#f59e0b',
-              borderWidth: 2,
-              pointRadius: 4,
-              yAxisID: 'y1'
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: { ticks: { font: { size: 9 }, maxRotation: 45, minRotation: 25 } },
-            y: { title: { display: true, text: 'Tons', font: { size: 10, weight: 'bold' } } },
-            y1: { position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'TAT (Hrs)', font: { size: 10, weight: 'bold' } } }
-          },
-          plugins: {
-            legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10, weight: 'bold' } } }
-          }
-        }
-      });
-    }
-
-    function renderTables(destMap, driverMap) {
-      // 1. Destination Table
-      const destBody = document.getElementById('destTableBody');
-      destBody.innerHTML = '';
-      const sortedDests = Object.keys(destMap).sort((a,b) => destMap[b].dispatched - destMap[a].dispatched);
-      sortedDests.forEach(d => {
-        const item = destMap[d];
-        const tat = item.tatCount > 0 ? (item.tatSum / item.tatCount).toFixed(1) + " h" : "24.5 h";
-        destBody.innerHTML += `
-          <tr class="hover:bg-slate-50 transition">
-            <td class="p-2 font-bold text-slate-800">${d}</td>
-            <td class="p-2 text-center text-slate-600 font-semibold">${item.trips}</td>
-            <td class="p-2 text-right font-black text-blue-700">${item.dispatched} MT</td>
-            <td class="p-2 text-right font-bold text-teal-700">${item.delivered} MT</td>
-            <td class="p-2 text-right font-semibold text-purple-700">${tat}</td>
-          </tr>
-        `;
-      });
-
-      // 2. Driver Table (Interactive)
-      const driverBody = document.getElementById('driverTableBody');
-      driverBody.innerHTML = '';
-      const sortedDrivers = Object.keys(driverMap).sort((a,b) => driverMap[b].trips - driverMap[a].trips);
-      sortedDrivers.forEach(d => {
-        const item = driverMap[d];
-        const tat = item.tatCount > 0 ? (item.tatSum / item.tatCount).toFixed(1) + " h" : "-";
-        driverBody.innerHTML += `
-          <tr class="hover:bg-blue-50/50 cursor-pointer transition" onclick="selectDriver('${d.replace(/'/g, "\\'")}')">
-            <td class="p-2 font-bold text-blue-900 flex items-center gap-1.5">
-              <i class="fa-solid fa-user-circle text-slate-400"></i> ${d}
-            </td>
-            <td class="p-2 text-center text-slate-600 font-semibold">${item.trips}</td>
-            <td class="p-2 text-right font-black text-blue-700">${item.dispatched} MT</td>
-            <td class="p-2 text-right font-bold text-teal-700">${item.delivered} MT</td>
-            <td class="p-2 text-right font-semibold text-purple-700">${tat}</td>
-          </tr>
-        `;
-      });
-    }
-
-    function showToast(text, color) {
-      const toast = document.getElementById('statusToast');
-      toast.className = `text-center text-xs font-bold p-2.5 rounded-xl bg-${color}-100 text-${color}-800`;
-      toast.innerText = text;
-      toast.classList.remove('hidden');
-      setTimeout(() => { toast.classList.add('hidden'); }, 3000);
-    }
-  </script>
+  async function showHome() {
+    $('loginView').classList.add('hidden'); $('homeView').classList.remove('hidden');
+    JNP.header($('hdr'), 'Central Hub', 'सेंट्रल हब', { home: false, who: false, sync: async () => { JNP.busy(true); try { await JNP.refreshMe(); await JNP.masters(true); render(); JNP.toast('Updated', 'ok'); } catch (e) { JNP.toast(e.message, 'bad'); } finally { JNP.busy(false); } } });
+    render();
+    try { await JNP.refreshMe(); render(); } catch (e) { JNP.toast(e.message, 'warn'); }
+    JNP.masters().catch(() => { });
+  }
+  $('logoutBtn').onclick = () => { if (confirm('Logout from this phone?')) JNP.logout(); };
+  const s = JNP.session();
+  if (s && s.token) showHome(); else showLogin();
+})();
+</script>
 </body>
 </html>
